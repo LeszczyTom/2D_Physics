@@ -837,7 +837,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "physique_2d"
+name = "physics_2d"
 version = "0.1.0"
 dependencies = [
  "druid",
