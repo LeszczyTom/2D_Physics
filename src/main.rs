@@ -182,10 +182,10 @@ impl AppData {
     fn set_size(&mut self, size: Size) {
         self.size = size;
 
-        self.obstacles.push( Obstacle { x: 0., y: 0., width: size.width, height: 1., color: Color::RED } );
-        self.obstacles.push( Obstacle { x: 0., y: 0., width: 1., height: size.height, color: Color::RED } );
-        self.obstacles.push( Obstacle { x: size.width - 1., y: 0., width: 1., height: size.height, color: Color::RED } );
-        self.obstacles.push( Obstacle { x: 0., y: size.height - 1., width: size.width, height: 1., color: Color::RED } );
+        self.obstacles.push( Obstacle { x: 0., y: -99., width: size.width, height: 100., color: Color::RED } );
+        self.obstacles.push( Obstacle { x: -99., y: 0., width: 100., height: size.height, color: Color::RED } );
+        self.obstacles.push( Obstacle { x: size.width - 1., y: 0., width: 100., height: size.height, color: Color::RED } );
+        self.obstacles.push( Obstacle { x: 0., y: size.height - 1., width: size.width, height: 100., color: Color::RED } );
     }
 
     fn add_obstacle(&mut self, obstacle: Obstacle) {
@@ -197,27 +197,141 @@ impl AppData {
     }
 
     fn update(&mut self) {
-        for ball in self.balls.iter_mut() {
-            ball.update();
+        let mut balls = self.balls.clone();
+        for i in 0..balls.len() {
+            balls[i].update();
             for obstacle in self.obstacles.iter() {
-                if !ball.resting {
-                    resolve_colision(ball, obstacle);     
-                }  
+                if are_ball_obstacle_overlapping(&balls[i], obstacle) {
+                    resolve_overlap(&mut balls, i, obstacle);
+                }
+            }
+
+            for j in 0..balls.len() {
+                if i != j {
+                    if are_balls_overlapping(&balls[i], &balls[j]) {
+                        resolve_ball_overlap(&mut balls, i, j);
+                    }
+                }
             }
         }
+        self.balls = balls;
     }
 }
 
-fn resolve_colision(ball: &mut Ball, obstacle: &Obstacle) {
-    let delta_x = ball.x - f64::max(obstacle.x, f64::min(ball.x, obstacle.x + obstacle.width));
-    let delta_y = ball.y - f64::max(obstacle.y, f64::min(ball.y, obstacle.y + obstacle.height));
-    if (delta_x * delta_x + delta_y * delta_y) > (ball.radius * ball.radius) {
-        return;
+fn resolve_ball_overlap(balls: &mut Vec<Ball>, i: usize, j: usize) {
+    let mut b1 = balls[i].clone();
+    let mut b2 = balls[j].clone();
+
+    let delta_x = b1.x - f64::max(b2.x, f64::min(b1.x, b2.x));
+    let delta_y = b1.y - f64::max(b2.y, f64::min(b1.y, b2.y));
+    let radius_sum: f64 = b1.radius + b2.radius;
+    if (delta_x * delta_x + delta_y * delta_y) > (radius_sum * radius_sum) {
+        return ;
     }
 
     let distance = f64::sqrt(delta_x * delta_x + delta_y * delta_y);
     if distance == 0. {
         return;
+    }
+
+    b1.resting = false;
+    b2.resting = false;
+
+    let overlap = 0.5 * (distance - radius_sum);
+
+    b1.x -= delta_x * overlap / distance;
+    b1.y -= delta_y * overlap / distance;
+
+    b2.x += delta_x * overlap / distance;
+    b2.y += delta_y * overlap / distance;
+
+    let normal_x = delta_x / distance;
+    let normal_y = delta_y / distance;
+
+    let tan_x = -normal_y;
+    let tan_y = normal_x;
+
+    let dot_product_tan_b1 = b1.vx * tan_x + b1.vy * tan_y;
+    let dot_product_tan_b2 = b2.vx * tan_x + b2.vy * tan_y;
+
+    let dot_product_normal_b1 = b1.vx * normal_x + b1.vy * normal_y;
+    let dot_product_normal_b2 = b2.vx * normal_x + b2.vy * normal_y;
+
+    //https://en.wikipedia.org/wiki/Elastic_collision
+    // Same mass for the moment
+    let v1 = dot_product_normal_b2;
+    let v2 = dot_product_normal_b1;
+
+    b1.vx = tan_x * dot_product_tan_b1 + normal_x * v1;
+    b1.vy = tan_y * dot_product_tan_b1 + normal_y * v1;
+    b2.vx = tan_x * dot_product_tan_b2 + normal_x * v2;
+    b2.vy = tan_y * dot_product_tan_b2 + normal_y * v2;
+
+    if b1.vx.abs() < 0.1 {
+        b1.vx = 0.;
+    }
+    if b1.vy.abs() < 0.1 {
+        b1.vy = 0.;
+    }
+    if b1.vx == 0. && b1.vy == 0. {
+        b1.resting = true;
+    }
+    if b2.vx.abs() < 0.1 {
+        b2.vx = 0.;
+    }
+    if b2.vy.abs() < 0.1 {
+        b2.vy = 0.;
+    }
+    if b2.vx == 0. && b2.vy == 0. {
+        b2.resting = true;
+    }
+
+
+    balls[i] = b1;
+    balls[j] = b2;
+}
+
+fn are_balls_overlapping(b1: &Ball, b2: &Ball) -> bool {
+    let ac = b1.x - f64::max(b2.x, f64::min(b1.x, b2.x));
+    let bc = b1.y - f64::max(b2.y, f64::min(b1.y, b2.y));
+    let radius_sum: f64 = b1.radius + b2.radius;
+    if (ac * ac + bc * bc) < (radius_sum * radius_sum) {
+        return true;
+    }
+    false
+}
+
+fn are_ball_obstacle_overlapping(ball: &Ball, obstacle: &Obstacle) -> bool{
+    let delta_x = ball.x - f64::max(obstacle.x, f64::min(ball.x, obstacle.x + obstacle.width));
+    let delta_y = ball.y - f64::max(obstacle.y, f64::min(ball.y, obstacle.y + obstacle.height));
+    if (delta_x * delta_x + delta_y * delta_y) > (ball.radius * ball.radius) {
+        return false;
+    }
+    true
+}
+
+fn resolve_overlap(balls: &mut Vec<Ball>, i: usize, obstacle: &Obstacle) {
+    let mut ball = balls[i].clone();
+    let delta_x = ball.x - f64::max(obstacle.x, f64::min(ball.x, obstacle.x + obstacle.width));
+    let delta_y = ball.y - f64::max(obstacle.y, f64::min(ball.y, obstacle.y + obstacle.height));
+    let distance = f64::sqrt(delta_x * delta_x + delta_y * delta_y);
+
+    let overlap = ball.radius - distance;
+    ball.x += delta_x * overlap / distance;
+    ball.y += delta_y * overlap / distance;
+
+    if distance == 0. {
+        return;
+    }
+ 
+    if ball.vx.abs() < 0.1 {
+        ball.vx = 0.;
+    }
+    if ball.vy.abs() < 0.1 {
+        ball.vy = 0.;
+    }
+    if ball.vx == 0. && ball.vy == 0. {
+        ball.resting = true;
     }
 
     let normal_x = delta_x / distance;
@@ -227,20 +341,17 @@ fn resolve_colision(ball: &mut Ball, obstacle: &Obstacle) {
     if dot_product > 0. {
         return;
     }
-    
-    if distance < ball.radius && f64::abs(ball.vy) < 0.1 && f64::abs(ball.vx) < 0.1 {
-        ball.resting = true;
-        return;
-    }
 
     ball.vx -= 2. * dot_product * normal_x;
     ball.vy -= 2. * dot_product * normal_y;
 
-    ball.vx *= 0.8;
-    ball.vy *= 0.8;
+    ball.vx *= 0.7;
+    ball.vy *= 0.7;
 
     ball.x += ball.vx;
     ball.y += ball.vy;
+
+    balls[i] = ball;
 }
 
 #[derive(Clone, Data, PartialEq, Debug)]
@@ -321,7 +432,7 @@ impl BallPreview {
 const BACKGROUND_COLOR: Color = Color::BLACK;
 const SIZE: Size = Size::new(1000., 700.);
 const UPDATE_PER_SECOND: u64 = 60;
-const GRAVITY: f64 = 0.15;
+const GRAVITY: f64 = 0.2;
 const COLORS: [Color; 8] = [Color::RED, Color::GREEN, Color::BLUE, Color::YELLOW, Color::PURPLE, Color::AQUA, Color::MAROON, Color::TEAL];
 const BALL_SIZE: f64 = 15.;
 
