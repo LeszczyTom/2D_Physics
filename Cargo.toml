@@ -2,8 +2,19 @@
 name = "physics_2d"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 druid = "0.7.0"
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
+[package.metadata.winres]
+OriginalFilename = "physics_2d.exe"
+ProductName = "physics_2d.exe"
+ProductVersion = "0.1.0"
+FileDescription = "definitely not a virus"
+LegalCopyright = "Copyright © 2022"
