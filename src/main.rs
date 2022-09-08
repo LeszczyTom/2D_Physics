@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 
 use druid::widget::prelude::*;
-use druid::{ AppLauncher, Color, LocalizedString, WindowDesc, Rect, TimerToken, Point };
+use druid::{ AppLauncher, Color, LocalizedString, WindowDesc, Rect, TimerToken, Point, MouseButton };
 use druid::piet::kurbo::{Circle, Line};
 use std::time::{Duration, Instant};
 
@@ -36,61 +36,76 @@ impl Widget<AppData> for CustomWidget {
                 }
             },
             Event::MouseDown(e) => {
-                data.preview.mouse_down_pos = Some(e.pos);
-                let colors_id = data.balls.len().rem_euclid(8) ;
-                data.preview.color = Some(COLORS[colors_id].clone());
-                //self.mouse_down_pos = Some(e.pos);
+                match e.button {
+                    MouseButton::Right => {
+                        data.gravity_point = Some(e.pos);
+                    },
+                    MouseButton::Left => {
+                        data.preview.mouse_down_pos = Some(e.pos);
+                        data.preview.color = Some(COLORS[data.balls.len().rem_euclid(8)].clone());
+                    },
+                    _ => {}
+                }
             },
             Event::MouseUp(e) => {
-                //println!("Mouse up at {:?}", e.pos);
-                //println!("Mouse down at {:?}", self.mouse_down_pos);
-                if data.preview.mouse_down_pos.is_none() {
-                    return;
+                match e.button {
+                    MouseButton::Right => {
+                        data.gravity_point = None;
+                    },
+                    MouseButton::Left => {
+                        if data.preview.mouse_down_pos.is_none() {
+                            return;
+                        }
+        
+                        let mouse_down = data.preview.mouse_down_pos.unwrap();
+                        let mut delta_x = mouse_down.x - e.pos.x;
+                        let mut delta_y = mouse_down.y - e.pos.y;
+                        
+                        //scale down vector
+                        let mut scale = 1.;
+                        if delta_x.abs() > BALL_SIZE || delta_y.abs() > BALL_SIZE {
+                            scale = 15. / delta_x.abs().max(delta_y.abs());
+                        }
+        
+                        delta_x *= scale;
+                        delta_y *= scale;
+        
+                        let new_ball = Ball::new(mouse_down.x, mouse_down.y, delta_x, delta_y, BALL_SIZE, data.preview.color.as_ref().unwrap().clone());
+                        data.balls.push(new_ball);
+                        //println!("Normal: {}, {}", delta_x, delta_y);
+                        data.preview.mouse_down_pos = None;
+                        data.preview.color = None;
+                        data.preview.arrow = None;
+                    },
+                    _ => {}
                 }
-
-                let mouse_down = data.preview.mouse_down_pos.unwrap();
-                let mut delta_x = mouse_down.x - e.pos.x;
-                let mut delta_y = mouse_down.y - e.pos.y;
                 
-                //scale down vector
-                let mut scale = 1.;
-                if delta_x.abs() > BALL_SIZE || delta_y.abs() > BALL_SIZE {
-                    scale = 15. / delta_x.abs().max(delta_y.abs());
-                }
-
-                delta_x *= scale;
-                delta_y *= scale;
-
-                let new_ball = Ball::new(mouse_down.x, mouse_down.y, delta_x, delta_y, BALL_SIZE, data.preview.color.as_ref().unwrap().clone());
-                data.balls.push(new_ball);
-                //println!("Normal: {}, {}", delta_x, delta_y);
-                data.preview.mouse_down_pos = None;
-                data.preview.color = None;
-                data.preview.arrow = None;
             },
             Event::MouseMove(e) => {
-                if data.preview.mouse_down_pos.is_none() {
-                    return;
-                }
-                let mouse_down_pos = data.preview.mouse_down_pos.unwrap();
+                if e.buttons.has_left() {
+                    let mouse_down_pos = data.preview.mouse_down_pos.unwrap();
                 
-                let delta_x = mouse_down_pos.x - e.pos.x;
-                let delta_y = mouse_down_pos.y - e.pos.y;
+                    let delta_x = mouse_down_pos.x - e.pos.x;
+                    let delta_y = mouse_down_pos.y - e.pos.y;
 
-                let angle = (delta_y / delta_x).atan();
-                let x: f64;
-                let y: f64;
-                let r = BALL_SIZE * 4.;
+                    let angle = (delta_y / delta_x).atan();
+                    let x: f64;
+                    let y: f64;
+                    let r = BALL_SIZE * 4.;
 
-                if e.pos.x < mouse_down_pos.x {
-                    x = r * angle.cos() + mouse_down_pos.x;
-                    y = r * angle.sin() + mouse_down_pos.y;
-                } else {
-                    x = -r * angle.cos() + mouse_down_pos.x;
-                    y = -r * angle.sin() + mouse_down_pos.y;
-                }        
+                    if e.pos.x < mouse_down_pos.x {
+                        x = r * angle.cos() + mouse_down_pos.x;
+                        y = r * angle.sin() + mouse_down_pos.y;
+                    } else {
+                        x = -r * angle.cos() + mouse_down_pos.x;
+                        y = -r * angle.sin() + mouse_down_pos.y;
+                    }        
 
-                data.preview.arrow = Some(Line::new(mouse_down_pos, Point::new(x, y)));
+                    data.preview.arrow = Some(Line::new(mouse_down_pos, Point::new(x, y)));
+                }
+                if e.buttons.has_right() {
+                    data.gravity_point = Some(e.pos);
+                }
             }
             _ => (),
         }
@@ -167,15 +182,19 @@ struct AppData {
     balls: Vec<Ball>,
     size: Size,
     preview: BallPreview,
+    gravity_point: Option<Point>,
+    gravity_tuple: (f64, f64),
 }
 
 impl AppData {
-    fn new() -> Self {
+    fn new(size: Size, gravity_tuple: (f64, f64)) -> Self {
         Self {
             obstacles: Vec::new(),
             balls: Vec::new(),
-            size: SIZE,
+            size,
             preview: BallPreview::new(),
+            gravity_point: None,
+            gravity_tuple,
         }
     }
 
@@ -199,7 +218,7 @@ impl AppData {
     fn update(&mut self) {
         let mut balls = self.balls.clone();
         for i in 0..balls.len() {
-            balls[i].update();
+            balls[i].update(self.gravity_point, self.gravity_tuple);
             for obstacle in self.obstacles.iter() {
                 if are_ball_obstacle_overlapping(&balls[i], obstacle) {
                     resolve_overlap(&mut balls, i, obstacle);
@@ -273,19 +292,12 @@ fn resolve_ball_overlap(balls: &mut Vec<Ball>, i: usize, j: usize) {
     if b1.vy.abs() < 0.1 {
         b1.vy = 0.;
     }
-    if b1.vx == 0. && b1.vy == 0. {
-        b1.resting = true;
-    }
     if b2.vx.abs() < 0.1 {
         b2.vx = 0.;
     }
     if b2.vy.abs() < 0.1 {
         b2.vy = 0.;
     }
-    if b2.vx == 0. && b2.vy == 0. {
-        b2.resting = true;
-    }
-
 
     balls[i] = b1;
     balls[j] = b2;
@@ -329,9 +341,6 @@ fn resolve_overlap(balls: &mut Vec<Ball>, i: usize, obstacle: &Obstacle) {
     }
     if ball.vy.abs() < 0.1 {
         ball.vy = 0.;
-    }
-    if ball.vx == 0. && ball.vy == 0. {
-        ball.resting = true;
     }
 
     let normal_x = delta_x / distance;
@@ -389,7 +398,7 @@ impl Ball {
         }
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, gravity_point: Option<Point>, gravity_tuple: (f64, f64)) {
         if self.resting {
             return;
         }
@@ -403,10 +412,25 @@ impl Ball {
         self.vx *= 0.99;
         self.vy *= 0.99;
 
-        if self.vy < self.terminal_velocity {
-            self.vy += GRAVITY;
-        }
+        if gravity_point.is_none() {
+            if self.vx < self.terminal_velocity {
+                self.vx += gravity_tuple.0;
+            }
+            if self.vy < self.terminal_velocity {
+                self.vy += gravity_tuple.1;
+            }            
+        } else {
+            let distance_from_point = f64::sqrt((self.x - gravity_point.unwrap().x).powi(2) + (self.y - gravity_point.unwrap().y).powi(2));
 
+            let normal_x = (self.x - gravity_point.unwrap().x) / distance_from_point;
+            let normal_y = (self.y - gravity_point.unwrap().y) / distance_from_point;
+
+            let dot_product = self.vx * normal_x + self.vy * normal_y;
+            
+            self.vx = (dot_product * normal_x) + 0.5 * -normal_x;
+            self.vy = (dot_product * normal_y) + 0.5 * -normal_y;
+        }
+        
         self.x += self.vx;
         self.y += self.vy;
     }
@@ -432,7 +456,6 @@ impl BallPreview {
 const BACKGROUND_COLOR: Color = Color::BLACK;
 const SIZE: Size = Size::new(1000., 700.);
 const UPDATE_PER_SECOND: u64 = 60;
-const GRAVITY: f64 = 0.2;
 const COLORS: [Color; 8] = [Color::RED, Color::GREEN, Color::BLUE, Color::YELLOW, Color::PURPLE, Color::AQUA, Color::MAROON, Color::TEAL];
 const BALL_SIZE: f64 = 15.;
 
@@ -449,7 +472,7 @@ pub fn main() {
                     .resizable(false);
 
     let launcher = AppLauncher::with_window(window);
-    let mut data = AppData::new();
+    let mut data = AppData::new(SIZE, (0., 0.2));
    
     data.add_ball(Ball::new(100.0, 100.0, 21.0, -10.0, BALL_SIZE, Color::WHITE));
     data.add_ball(Ball::new(20.0, 10.0, -5.0, -3.0, BALL_SIZE, Color::GREEN));
