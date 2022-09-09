@@ -1,6 +1,6 @@
 [package]
 name = "physics_2d"
-version = "0.1.0"
+version = "0.3.1"
 edition = "2021"
 build = "build.rs"
 
@@ -15,6 +15,5 @@ winres = "0.1"
 [package.metadata.winres]
 OriginalFilename = "physics_2d.exe"
 ProductName = "physics_2d.exe"
-ProductVersion = "0.1.0"
-FileDescription = "definitely not a virus"
-LegalCopyright = "Copyright © 2022"
+ProductVersion = "0.3.1"
+FileDescription = "definitely not a malware"
