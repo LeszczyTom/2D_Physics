@@ -37,9 +37,6 @@ impl Ball {
     }
 
     pub fn move_ball(&mut self, cursor_pos: Point) {
-        let delta_x = self.x - cursor_pos.x;
-        let delta_y = self.y - cursor_pos.y;
-
         self.x = cursor_pos.x;
         self.y = cursor_pos.y;
         

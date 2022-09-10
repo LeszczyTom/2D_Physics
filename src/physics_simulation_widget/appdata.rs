@@ -8,6 +8,7 @@ pub struct Params {
     pub spawn_tool: bool,
     pub attraction_tool: bool,
     pub move_tool: bool,
+    pub paused: bool,
 }
 
 impl Params {
@@ -19,6 +20,7 @@ impl Params {
             spawn_tool: true,
             attraction_tool: true,
             move_tool: false,
+            paused: false,
         }
     }
 }

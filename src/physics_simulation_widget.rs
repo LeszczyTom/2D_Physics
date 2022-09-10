@@ -38,6 +38,11 @@ impl PhysicsSimulationWidget {
 
 impl Widget<AppData> for PhysicsSimulationWidget {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppData, _env: &Env) {
+        attraction_tool(event, data);
+        move_tool(event, data);
+        delete_tool(event, data);
+        spawn_tool(event, data);
+
         match event {
             Event::WindowConnected => {
                 ctx.request_paint();
@@ -72,119 +77,14 @@ impl Widget<AppData> for PhysicsSimulationWidget {
                     }
                 }
             },
-            Event::MouseDown(e) => {
-                match e.button {
-                    MouseButton::Right => {
-                        if data.params.attraction_tool {
-                            data.gravity_point = Some(e.pos);
-                        }
-                        if data.params.delete_tool {
-                            for i in 0..data.balls.len() {
-                                if data.balls[i].contains_point(e.pos) {
-                                    data.balls.remove(i);
-                                    break;
-                                }
-                            }
-                        }
-                    },
-                    MouseButton::Left => {
-                        if data.params.spawn_tool {
-                            data.preview.mouse_down_pos = Some(e.pos);
-                            data.preview.color = Some(COLORS[data.balls.len().rem_euclid(8)].clone());
-                        }
-                    },
-                    _ => {}
-                }
-            },
-            Event::MouseUp(e) => {
-                match e.button {
-                    MouseButton::Right => {
-                        if data.params.attraction_tool {
-                            data.gravity_point = None;
-                        }
-                    },
-                    MouseButton::Left => {
-                        if data.params.spawn_tool {
-                            if data.preview.mouse_down_pos.is_none() {
-                                return;
-                            }
-            
-                            let mouse_down = data.preview.mouse_down_pos.unwrap();
-                            let mut delta_x = mouse_down.x - e.pos.x;
-                            let mut delta_y = mouse_down.y - e.pos.y;
-                            
-                            //scale down vector
-                            let mut scale = 1.;
-                            if delta_x.abs() > DEFAULT_BALL_SIZE || delta_y.abs() > DEFAULT_BALL_SIZE {
-                                scale = 15. / delta_x.abs().max(delta_y.abs());
-                            }
-            
-                            delta_x *= scale;
-                            delta_y *= scale;
-            
-                            let new_ball = Ball::new(mouse_down.x, mouse_down.y, delta_x, delta_y, DEFAULT_BALL_SIZE, data.preview.color.as_ref().unwrap().clone());
-                            data.balls.push(new_ball);
-                            //println!("Normal: {}, {}", delta_x, delta_y);
-                            data.preview.mouse_down_pos = None;
-                            data.preview.color = None;
-                            data.preview.arrow = None;
-                        }
-
-                        if data.params.move_tool {
-                            for i in 0..data.balls.len() {
-                                if data.balls[i].contains_point(e.pos) {
-                                    data.balls[i].resting = false;
-                                    break;
-                                }
-                            }                        
-                        } 
-                    },
-                    _ => {}
-                }
-            },
-            Event::MouseMove(e) => {
+            Event::MouseMove(_e) => {
                 if !ctx.is_hot() {
                     data.preview.mouse_down_pos = None;
                     data.preview.arrow = None;
                     data.preview.color = None;
                     data.gravity_point = None;
                     return;                    
-                }
-                if e.buttons.has_left() {
-                    if data.params.spawn_tool {
-                        let mouse_down_pos = data.preview.mouse_down_pos.unwrap();
-                    
-                        let delta_x = mouse_down_pos.x - e.pos.x;
-                        let delta_y = mouse_down_pos.y - e.pos.y;
-
-                        let angle = (delta_y / delta_x).atan();
-                        let x: f64;
-                        let y: f64;
-                        let r = 60.;
-
-                        if e.pos.x < mouse_down_pos.x {
-                            x = r * angle.cos() + mouse_down_pos.x;
-                            y = r * angle.sin() + mouse_down_pos.y;
-                        } else {
-                            x = -r * angle.cos() + mouse_down_pos.x;
-                            y = -r * angle.sin() + mouse_down_pos.y;
-                        }  
-                        data.preview.arrow = Some(Line::new(mouse_down_pos, Point::new(x, y)));    
-                    }   
-                    if data.params.move_tool {
-                        for i in 0..data.balls.len() {
-                            if data.balls[i].contains_point(e.pos) {
-                                data.balls[i].move_ball(e.pos);
-                                break;
-                            }
-                        }                        
-                    }     
-                } 
-                if e.buttons.has_right() {
-                    if data.params.attraction_tool {
-                        data.gravity_point = Some(e.pos);
-                    }
-                }         
+                }  
             },
             _ => {}        
         }        
@@ -379,11 +279,164 @@ pub fn get_new_appdata(size: Size) -> AppData {
 
     data.add_ball(Ball::new(100.0, 100.0, 21.0, -10.0, DEFAULT_BALL_SIZE, Color::WHITE));
     data.add_ball(Ball::new(25.0, 15.0, -5.0, -3.0, DEFAULT_BALL_SIZE, Color::GREEN));
-    data.add_ball(Ball::new(50.0, 50.0, 0.0, 15.0, DEFAULT_BALL_SIZE, Color::BLUE));
+    data.add_ball(Ball::new(50.0, 50.0, 0.0, 15.0, DEFAULT_BALL_SIZE, Color::SILVER));
     data.add_ball(Ball::new(220.0, 110.0, 0.0, 5.0, DEFAULT_BALL_SIZE, Color::YELLOW));
     data.add_ball(Ball::new(400.0, 500.0, -10.0, 1.0, DEFAULT_BALL_SIZE, Color::OLIVE));
     data.add_obstacle(Obstacle { x: 200., y: 200., width: 100., height: 100., color: Color::RED });
     data.add_obstacle(Obstacle { x: 50., y: 600., width: 500., height: 10., color: Color::RED });
 
     data
+}
+
+fn attraction_tool(event: &Event, data: &mut AppData) {    
+    if !data.params.attraction_tool {
+        return;
+    }
+
+    match event {
+        Event::MouseDown(e) => {
+            if e.button != MouseButton::Right {
+                return;
+            }
+                
+            data.gravity_point = Some(e.pos);
+        },
+        Event::MouseUp(e) => {
+            if e.button != MouseButton::Right {
+                return;
+            }
+
+            data.gravity_point = None;
+        },
+        Event::MouseMove(e) => {
+            if e.buttons.has_right() {
+                if data.params.attraction_tool {
+                    data.gravity_point = Some(e.pos);
+                }
+            } 
+        },
+        _ => {} 
+    };
+}
+
+fn move_tool(event: &Event, data: &mut AppData) {
+    if !data.params.move_tool {
+        return;
+    }
+    match event {
+        Event::MouseUp(e) => {
+            if e.button != MouseButton::Left {
+                return;
+            }
+
+            for i in 0..data.balls.len() {
+                if data.balls[i].contains_point(e.pos) {
+                    data.balls[i].resting = false;
+                    break;
+                }
+            }  
+        },
+        Event::MouseMove(e) => {
+            if e.buttons.has_left() {
+                for i in 0..data.balls.len() {
+                    if data.balls[i].contains_point(e.pos) {
+                        data.balls[i].move_ball(e.pos);
+                        break;
+                    }
+                }  
+            }
+        },
+        _ => {}
+    }
+}
+
+fn delete_tool(event: &Event, data: &mut AppData) {
+    if !data.params.delete_tool {
+        return;
+    }
+
+    match event {
+        Event::MouseDown(e) => {
+            if e.button != MouseButton::Right {
+                return;
+            }
+
+            for i in 0..data.balls.len() {
+                if data.balls[i].contains_point(e.pos) {
+                    data.balls.remove(i);
+                    break;
+                }
+            }   
+        },
+        _ => {}
+    }
+}
+
+fn spawn_tool(event: &Event, data: &mut AppData) {
+    if !data.params.spawn_tool {
+        return;
+    }
+    match event {
+        Event::MouseDown(e) => {
+            if e.button != MouseButton::Left {
+                return;
+            }
+
+            if data.params.spawn_tool {
+                data.preview.mouse_down_pos = Some(e.pos);
+                data.preview.color = Some(COLORS[data.balls.len().rem_euclid(8)].clone());
+            }   
+        },
+        Event::MouseUp(e) => {
+            if e.button != MouseButton::Left || data.preview.mouse_down_pos.is_none() {
+                return;
+            }
+
+            let mouse_down = data.preview.mouse_down_pos.unwrap();
+            let mut delta_x = mouse_down.x - e.pos.x;
+            let mut delta_y = mouse_down.y - e.pos.y;
+            
+            //scale down vector
+            let mut scale = 1.;
+            if delta_x.abs() > DEFAULT_BALL_SIZE || delta_y.abs() > DEFAULT_BALL_SIZE {
+                scale = 15. / delta_x.abs().max(delta_y.abs());
+            }
+
+            delta_x *= scale;
+            delta_y *= scale;
+
+            let new_ball = Ball::new(mouse_down.x, mouse_down.y, delta_x, delta_y, DEFAULT_BALL_SIZE, data.preview.color.as_ref().unwrap().clone());
+            data.balls.push(new_ball);
+            //println!("Normal: {}, {}", delta_x, delta_y);
+            data.preview.mouse_down_pos = None;
+            data.preview.color = None;
+            data.preview.arrow = None;
+        },
+        Event::MouseMove(e) => {
+            if !data.params.spawn_tool || !e.buttons.has_left(){
+                return;
+            }
+                
+            let mouse_down_pos = data.preview.mouse_down_pos.unwrap();
+        
+            let delta_x = mouse_down_pos.x - e.pos.x;
+            let delta_y = mouse_down_pos.y - e.pos.y;
+
+            let angle = (delta_y / delta_x).atan();
+            let x: f64;
+            let y: f64;
+            let r = 60.;
+
+            if e.pos.x < mouse_down_pos.x {
+                x = r * angle.cos() + mouse_down_pos.x;
+                y = r * angle.sin() + mouse_down_pos.y;
+            } else {
+                x = -r * angle.cos() + mouse_down_pos.x;
+                y = -r * angle.sin() + mouse_down_pos.y;
+            }  
+
+            data.preview.arrow = Some(Line::new(mouse_down_pos, Point::new(x, y)));          
+        },
+        _ => {}
+    }
 }
