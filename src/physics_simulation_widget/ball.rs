@@ -43,8 +43,8 @@ impl Ball {
         self.x = cursor_pos.x;
         self.y = cursor_pos.y;
         
-        self.vx = delta_x * -4.;
-        self.vy = delta_y * -4.;
+        self.vx = 0.;
+        self.vy = 0.;
 
         self.resting = true;
     }

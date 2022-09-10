@@ -84,10 +84,10 @@ impl AppData {
 
     pub fn set_border_wall(&mut self) {
         let borders = [
-            Obstacle { x: 0., y: self.size.height - 1., width: self.size.width, height: 100., color: Color::RED },
-            Obstacle { x: self.size.width - 1., y: 0., width: 100., height: self.size.height, color: Color::RED },
-            Obstacle { x: -99., y: 0., width: 100., height: self.size.height, color: Color::RED },
-            Obstacle { x: 0., y: -99., width: self.size.width, height: 100., color: Color::RED },
+            Obstacle { x: 0., y: self.size.height - 1., width: self.size.width, height: 1., color: Color::RED },
+            Obstacle { x: self.size.width - 1., y: 0., width: 1., height: self.size.height, color: Color::RED },
+            Obstacle { x: 1., y: 0., width: 1., height: self.size.height, color: Color::RED },
+            Obstacle { x: 0., y: 1., width: self.size.width, height: 1., color: Color::RED },
         ];
 
         if self.border_wall.is_some() {
