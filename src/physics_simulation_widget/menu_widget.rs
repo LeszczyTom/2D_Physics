@@ -45,4 +45,12 @@ pub fn test() -> impl Widget<AppData> {
                     data.params.attraction_tool = false;
                 }))
         .with_flex_spacer(10.)
+        .with_child(
+            Align::centered(
+                Button::new(|data: &AppData, _: &Env| format!("{}", if data.params.paused {"Resume"} else {"Pause"}))
+                    .on_click(|_, data, _| {
+                        data.params.paused = !data.params.paused;
+                    })
+            ))
+        .with_spacer(10.)
 }

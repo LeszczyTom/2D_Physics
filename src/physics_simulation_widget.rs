@@ -22,7 +22,6 @@ pub struct PhysicsSimulationWidget {
     timer_id: TimerToken,
     last_update: Instant,
     updates_per_second: u64,
-    paused: bool,
 }
 
 impl PhysicsSimulationWidget {
@@ -31,18 +30,12 @@ impl PhysicsSimulationWidget {
             timer_id: TimerToken::INVALID,
             last_update: Instant::now(),
             updates_per_second,
-            paused: false
         }
     }
 }
 
 impl Widget<AppData> for PhysicsSimulationWidget {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppData, _env: &Env) {
-        attraction_tool(event, data);
-        move_tool(event, data);
-        delete_tool(event, data);
-        spawn_tool(event, data);
-
         match event {
             Event::WindowConnected => {
                 ctx.request_paint();
@@ -55,7 +48,7 @@ impl Widget<AppData> for PhysicsSimulationWidget {
                     if data.size != ctx.size() {
                         data.set_size(ctx.size());
                     }
-                    if !self.paused {
+                    if !data.params.paused {
                         data.update();
                         ctx.request_paint();
                     }
@@ -87,7 +80,16 @@ impl Widget<AppData> for PhysicsSimulationWidget {
                 }  
             },
             _ => {}        
-        }        
+        } 
+        
+        if data.params.paused {
+            return;
+        }
+        
+        attraction_tool(event, data);
+        move_tool(event, data);
+        delete_tool(event, data);
+        spawn_tool(event, data);
     }
 
     fn lifecycle(
