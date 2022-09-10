@@ -1,12 +1,8 @@
-use super::*;
+use druid::widget::{ Widget, Checkbox, Align, Flex, Label, Button };
+use druid::{ WidgetExt, Env };
+use crate::physics_simulation_widget::appdata::{ Params, AppData };
 
-use druid::widget::{ Checkbox, Align, Flex, Label, Button };
-use appdata::{ Params, AppData };
-use druid::WidgetExt;
-
-pub fn test() -> impl Widget<AppData> {
-    let mut paused = "Pause";
-
+pub fn get_menu() -> impl Widget<AppData> {
     Flex::column()
         .with_flex_spacer(10.)
         .with_child(Align::left(Checkbox::new("Zero Gravity").lens(Params::zero_gravity)).lens(AppData::params))

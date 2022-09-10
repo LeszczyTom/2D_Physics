@@ -2,7 +2,6 @@ pub mod appdata;
 pub mod obstacle;
 pub mod ball;
 pub mod ball_preview;
-pub mod menu_widget;
 
 pub use appdata::AppData;
 pub use obstacle::Obstacle;
@@ -85,7 +84,7 @@ impl Widget<AppData> for PhysicsSimulationWidget {
         if data.params.paused {
             return;
         }
-        
+
         attraction_tool(event, data);
         move_tool(event, data);
         delete_tool(event, data);
