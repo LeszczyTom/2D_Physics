@@ -3,7 +3,7 @@
 use druid::widget::prelude::*;
 use druid::{ AppLauncher, LocalizedString, WindowDesc, Widget };
 
-use druid::widget::{ Align, Container, Label, Padding, Split };
+use druid::widget::{ Container, Padding, Split };
 use druid::piet::Color;
 
 pub mod physics_simulation_widget;
@@ -14,7 +14,7 @@ fn build_app() -> impl Widget<physics_simulation_widget::AppData> {
         Container::new(
             Split::columns(
                 physics_simulation_widget::PhysicsSimulationWidget::new(60),
-                Align::centered(Label::new("Split B")),
+                physics_simulation_widget::menu_widget::test()
             )
             .split_point(0.85)
             .bar_size(5.0)

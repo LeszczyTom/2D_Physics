@@ -2,19 +2,21 @@ pub mod appdata;
 pub mod obstacle;
 pub mod ball;
 pub mod ball_preview;
+pub mod menu_widget;
 
 pub use appdata::AppData;
 pub use obstacle::Obstacle;
 pub use ball::Ball;
 pub use ball_preview::BallPreview;
 use druid::widget::prelude::*;
-use druid::{ Color, Rect, TimerToken, Point, MouseButton };
+use druid::{ Color, Rect, TimerToken, Point, MouseButton, Lens };
 use druid::piet::kurbo::{ Circle, Line };
 use std::time::{ Duration, Instant };
 
 const BACKGROUND_COLOR: Color = Color::BLACK;
-const COLORS: [Color; 8] = [Color::RED, Color::GREEN, Color::BLUE, Color::YELLOW, Color::PURPLE, Color::AQUA, Color::MAROON, Color::TEAL];
+const COLORS: [Color; 8] = [Color::RED, Color::GREEN, Color::SILVER, Color::YELLOW, Color::PURPLE, Color::AQUA, Color::MAROON, Color::TEAL];
 const DEFAULT_BALL_SIZE: f64 = 15.;
+const DEFAULT_GRAVITY_TUPLE: (f64, f64) = (0., 0.2);
 
 pub struct PhysicsSimulationWidget {
     timer_id: TimerToken,
@@ -55,16 +57,41 @@ impl Widget<AppData> for PhysicsSimulationWidget {
                     let deadline = Duration::from_millis(1000 / self.updates_per_second);
                     self.last_update = Instant::now();
                     self.timer_id = ctx.request_timer(deadline);
+
+
+                    if data.params.zero_gravity && data.gravity_tuple != (0., 0.) {
+                        data.gravity_tuple = (0., 0.);
+                    } else if !data.params.zero_gravity && data.gravity_tuple == (0., 0.) {
+                        data.gravity_tuple = DEFAULT_GRAVITY_TUPLE;
+                    } 
+
+                    if data.params.walls && data.border_wall.is_none() {
+                        data.set_border_wall();
+                    } else if !data.params.walls && data.border_wall.is_some() {
+                        data.remove_wall();
+                    }
                 }
             },
             Event::MouseDown(e) => {
                 match e.button {
                     MouseButton::Right => {
-                        data.gravity_point = Some(e.pos);
+                        if data.params.attraction_tool {
+                            data.gravity_point = Some(e.pos);
+                        }
+                        if data.params.delete_tool {
+                            for i in 0..data.balls.len() {
+                                if data.balls[i].contains_point(e.pos) {
+                                    data.balls.remove(i);
+                                    break;
+                                }
+                            }
+                        }
                     },
                     MouseButton::Left => {
-                        data.preview.mouse_down_pos = Some(e.pos);
-                        data.preview.color = Some(COLORS[data.balls.len().rem_euclid(8)].clone());
+                        if data.params.spawn_tool {
+                            data.preview.mouse_down_pos = Some(e.pos);
+                            data.preview.color = Some(COLORS[data.balls.len().rem_euclid(8)].clone());
+                        }
                     },
                     _ => {}
                 }
@@ -72,32 +99,45 @@ impl Widget<AppData> for PhysicsSimulationWidget {
             Event::MouseUp(e) => {
                 match e.button {
                     MouseButton::Right => {
-                        data.gravity_point = None;
+                        if data.params.attraction_tool {
+                            data.gravity_point = None;
+                        }
                     },
                     MouseButton::Left => {
-                        if data.preview.mouse_down_pos.is_none() {
-                            return;
+                        if data.params.spawn_tool {
+                            if data.preview.mouse_down_pos.is_none() {
+                                return;
+                            }
+            
+                            let mouse_down = data.preview.mouse_down_pos.unwrap();
+                            let mut delta_x = mouse_down.x - e.pos.x;
+                            let mut delta_y = mouse_down.y - e.pos.y;
+                            
+                            //scale down vector
+                            let mut scale = 1.;
+                            if delta_x.abs() > DEFAULT_BALL_SIZE || delta_y.abs() > DEFAULT_BALL_SIZE {
+                                scale = 15. / delta_x.abs().max(delta_y.abs());
+                            }
+            
+                            delta_x *= scale;
+                            delta_y *= scale;
+            
+                            let new_ball = Ball::new(mouse_down.x, mouse_down.y, delta_x, delta_y, DEFAULT_BALL_SIZE, data.preview.color.as_ref().unwrap().clone());
+                            data.balls.push(new_ball);
+                            //println!("Normal: {}, {}", delta_x, delta_y);
+                            data.preview.mouse_down_pos = None;
+                            data.preview.color = None;
+                            data.preview.arrow = None;
                         }
-        
-                        let mouse_down = data.preview.mouse_down_pos.unwrap();
-                        let mut delta_x = mouse_down.x - e.pos.x;
-                        let mut delta_y = mouse_down.y - e.pos.y;
-                        
-                        //scale down vector
-                        let mut scale = 1.;
-                        if delta_x.abs() > DEFAULT_BALL_SIZE || delta_y.abs() > DEFAULT_BALL_SIZE {
-                            scale = 15. / delta_x.abs().max(delta_y.abs());
-                        }
-        
-                        delta_x *= scale;
-                        delta_y *= scale;
-        
-                        let new_ball = Ball::new(mouse_down.x, mouse_down.y, delta_x, delta_y, DEFAULT_BALL_SIZE, data.preview.color.as_ref().unwrap().clone());
-                        data.balls.push(new_ball);
-                        //println!("Normal: {}, {}", delta_x, delta_y);
-                        data.preview.mouse_down_pos = None;
-                        data.preview.color = None;
-                        data.preview.arrow = None;
+
+                        if data.params.move_tool {
+                            for i in 0..data.balls.len() {
+                                if data.balls[i].contains_point(e.pos) {
+                                    data.balls[i].resting = false;
+                                    break;
+                                }
+                            }                        
+                        } 
                     },
                     _ => {}
                 }
@@ -111,32 +151,43 @@ impl Widget<AppData> for PhysicsSimulationWidget {
                     return;                    
                 }
                 if e.buttons.has_left() {
-                    let mouse_down_pos = data.preview.mouse_down_pos.unwrap();
-                
-                    let delta_x = mouse_down_pos.x - e.pos.x;
-                    let delta_y = mouse_down_pos.y - e.pos.y;
+                    if data.params.spawn_tool {
+                        let mouse_down_pos = data.preview.mouse_down_pos.unwrap();
+                    
+                        let delta_x = mouse_down_pos.x - e.pos.x;
+                        let delta_y = mouse_down_pos.y - e.pos.y;
 
-                    let angle = (delta_y / delta_x).atan();
-                    let x: f64;
-                    let y: f64;
-                    let r = 60.;
+                        let angle = (delta_y / delta_x).atan();
+                        let x: f64;
+                        let y: f64;
+                        let r = 60.;
 
-                    if e.pos.x < mouse_down_pos.x {
-                        x = r * angle.cos() + mouse_down_pos.x;
-                        y = r * angle.sin() + mouse_down_pos.y;
-                    } else {
-                        x = -r * angle.cos() + mouse_down_pos.x;
-                        y = -r * angle.sin() + mouse_down_pos.y;
-                    }        
-
-                    data.preview.arrow = Some(Line::new(mouse_down_pos, Point::new(x, y)));
-                }
+                        if e.pos.x < mouse_down_pos.x {
+                            x = r * angle.cos() + mouse_down_pos.x;
+                            y = r * angle.sin() + mouse_down_pos.y;
+                        } else {
+                            x = -r * angle.cos() + mouse_down_pos.x;
+                            y = -r * angle.sin() + mouse_down_pos.y;
+                        }  
+                        data.preview.arrow = Some(Line::new(mouse_down_pos, Point::new(x, y)));    
+                    }   
+                    if data.params.move_tool {
+                        for i in 0..data.balls.len() {
+                            if data.balls[i].contains_point(e.pos) {
+                                data.balls[i].move_ball(e.pos);
+                                break;
+                            }
+                        }                        
+                    }     
+                } 
                 if e.buttons.has_right() {
-                    data.gravity_point = Some(e.pos);
-                }
-            }
-            _ => (),
-        }
+                    if data.params.attraction_tool {
+                        data.gravity_point = Some(e.pos);
+                    }
+                }         
+            },
+            _ => {}        
+        }        
     }
 
     fn lifecycle(
@@ -324,10 +375,10 @@ fn resolve_overlap(balls: &mut Vec<Ball>, i: usize, obstacle: &Obstacle) {
 }
 
 pub fn get_new_appdata(size: Size) -> AppData {
-    let mut data = AppData::new(size, (0., 0.2));
+    let mut data = AppData::new(size, DEFAULT_GRAVITY_TUPLE);
 
     data.add_ball(Ball::new(100.0, 100.0, 21.0, -10.0, DEFAULT_BALL_SIZE, Color::WHITE));
-    data.add_ball(Ball::new(20.0, 10.0, -5.0, -3.0, DEFAULT_BALL_SIZE, Color::GREEN));
+    data.add_ball(Ball::new(25.0, 15.0, -5.0, -3.0, DEFAULT_BALL_SIZE, Color::GREEN));
     data.add_ball(Ball::new(50.0, 50.0, 0.0, 15.0, DEFAULT_BALL_SIZE, Color::BLUE));
     data.add_ball(Ball::new(220.0, 110.0, 0.0, 5.0, DEFAULT_BALL_SIZE, Color::YELLOW));
     data.add_ball(Ball::new(400.0, 500.0, -10.0, 1.0, DEFAULT_BALL_SIZE, Color::OLIVE));

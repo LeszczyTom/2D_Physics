@@ -1,6 +1,29 @@
 use super::*;
 
-#[derive(Clone, Data)]
+#[derive(Clone, Data, Lens, PartialEq)]
+pub struct Params {
+    pub zero_gravity: bool,
+    pub walls: bool,
+    pub delete_tool: bool,
+    pub spawn_tool: bool,
+    pub attraction_tool: bool,
+    pub move_tool: bool,
+}
+
+impl Params {
+    pub fn new() -> Self {
+        Self {
+            zero_gravity: false,
+            walls: true,
+            delete_tool: false,
+            spawn_tool: true,
+            attraction_tool: true,
+            move_tool: false,
+        }
+    }
+}
+
+#[derive(Clone, Data, Lens)]
 pub struct AppData {
     #[data(same_fn="PartialEq::eq")]
     pub obstacles: Vec<Obstacle>,
@@ -10,7 +33,8 @@ pub struct AppData {
     pub preview: BallPreview,
     pub gravity_point: Option<Point>,
     pub gravity_tuple: (f64, f64),
-    pub border_wall: Option<[Obstacle; 4]>
+    pub border_wall: Option<[Obstacle; 4]>,
+    pub params: Params,
 }
 
 impl AppData {
@@ -22,7 +46,8 @@ impl AppData {
             preview: BallPreview::new(),
             gravity_point: None,
             gravity_tuple,
-            border_wall: None
+            border_wall: None,
+            params: Params::new(),
         }
     }
 
@@ -39,6 +64,15 @@ impl AppData {
         for (i, obs) in self.obstacles.iter().enumerate() {
             if obstacle.equals(obs) {
                 self.obstacles.remove(i);
+                return;
+            }
+        }
+    }
+
+    pub fn remove_ball(&mut self, ball: Ball) {
+        for (i, b) in self.balls.iter().enumerate() {
+            if ball.equals(b) {
+                self.balls.remove(i);
                 return;
             }
         }
@@ -68,13 +102,16 @@ impl AppData {
     }
 
     pub fn remove_wall(&mut self) {
+        for i in 0..4 {
+            self.remove_obstacle(self.border_wall.as_ref().unwrap()[i].clone());
+        }
         self.border_wall = None;
     }
 
     pub fn update(&mut self) {
         let mut balls = self.balls.clone();
         for i in 0..balls.len() {
-            balls[i].update(self.gravity_point, self.gravity_tuple);
+            balls[i].update(self);
             for obstacle in self.obstacles.iter() {
                 if are_ball_obstacle_overlapping(&balls[i], obstacle) {
                     resolve_overlap(&mut balls, i, obstacle);

@@ -26,32 +26,69 @@ impl Ball {
         }
     }
 
-    pub fn update(&mut self, gravity_point: Option<Point>, gravity_tuple: (f64, f64)) {
+    pub fn equals(&self, other: &Ball) -> bool {
+        self.x == other.x && self.y == other.y && self.vx == other.vx && self.vy == other.vy && self.radius == other.radius && self.color == other.color
+    }
+
+    pub fn contains_point(&self, point: Point) -> bool {
+        let dx = self.x - point.x;
+        let dy = self.y - point.y;
+        dx * dx + dy * dy <= self.radius * self.radius
+    }
+
+    pub fn move_ball(&mut self, cursor_pos: Point) {
+        let delta_x = self.x - cursor_pos.x;
+        let delta_y = self.y - cursor_pos.y;
+
+        self.x = cursor_pos.x;
+        self.y = cursor_pos.y;
+        
+        self.vx = delta_x * -4.;
+        self.vy = delta_y * -4.;
+
+        self.resting = true;
+    }
+
+    pub fn update(&mut self, data: &AppData) {
         if self.resting {
             return;
         }
 
-        if self.x < 0. || self.x > 5000. || self.y < 0. || self.y > 5000. {
-            self.resting = true;
-            println!("Ball out of bounds");
-            return;
+        if self.x < 0. || self.x > data.size.width || self.y < 0. || self.y > data.size.height {
+            if data.params.walls {
+                self.resting = true;
+                println!("Ball out of bounds");
+                return;
+            } else {
+                if self.x < 0. {
+                    self.x = data.size.width;
+                } else if self.x > data.size.width {
+                    self.x = 0.;
+                }
+
+                if self.y < 0. {
+                    self.y = data.size.height;
+                } else if self.y > data.size.height {
+                    self.y = 0.;
+                }
+            }
         }
         
         self.vx *= 0.99;
         self.vy *= 0.99;
 
-        if gravity_point.is_none() {
+        if data.gravity_point.is_none() {
             if self.vx < self.terminal_velocity {
-                self.vx += gravity_tuple.0;
+                self.vx += data.gravity_tuple.0;
             }
             if self.vy < self.terminal_velocity {
-                self.vy += gravity_tuple.1;
+                self.vy += data.gravity_tuple.1;
             }            
         } else {
-            let distance_from_point = f64::sqrt((self.x - gravity_point.unwrap().x).powi(2) + (self.y - gravity_point.unwrap().y).powi(2));
+            let distance_from_point = f64::sqrt((self.x - data.gravity_point.unwrap().x).powi(2) + (self.y - data.gravity_point.unwrap().y).powi(2));
 
-            let normal_x = (self.x - gravity_point.unwrap().x) / distance_from_point;
-            let normal_y = (self.y - gravity_point.unwrap().y) / distance_from_point;
+            let normal_x = (self.x - data.gravity_point.unwrap().x) / distance_from_point;
+            let normal_y = (self.y - data.gravity_point.unwrap().y) / distance_from_point;
 
             let dot_product = self.vx * normal_x + self.vy * normal_y;
             
