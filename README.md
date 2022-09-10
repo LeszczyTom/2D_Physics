@@ -4,15 +4,9 @@
 ## What to expect
 * Balls can collide with obstacles.
 * Balls can collide with other balls.
-* Left click spawns new balls.
-* Right click attracts all the balls on the cursor.
+* Left click can spawns new balls or move ball.
+* Right click can attracts all the balls on the cursor or delete a ball.
 
-### Screenshots
-Left click:
-![2d_phy_1](https://user-images.githubusercontent.com/37774352/189219719-78cc5110-900a-4c99-8531-350089363063.gif)
-
-Right Click:
-![2d_phy_2](https://user-images.githubusercontent.com/37774352/189219844-aff56bea-2d6a-4c7c-bc67-b7416607a30a.gif)
 ***
 ## How to use
 If you want to compile it by yourself, you need to install [Rust and Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html). 
@@ -25,6 +19,17 @@ $ cargo run
 ```
 Or you can download the latest [release](https://github.com/LeszczyTom/2D_Physics/releases).  
 ***
+
+### Screenshots
+Walls:
+![walls](https://user-images.githubusercontent.com/37774352/189477955-66feac85-0793-4574-b087-1776bf4cec40.gif)
+Zero gravity:
+![gravity](https://user-images.githubusercontent.com/37774352/189477995-cfbcd8c8-d67f-49e7-823f-cb1f01dbc127.gif)
+Left click:
+![spwan_move](https://user-images.githubusercontent.com/37774352/189478107-8dae563a-218a-4868-8bf4-874e9f86bf81.gif)
+Right click:
+![right_click](https://user-images.githubusercontent.com/37774352/189478154-88f71254-a9d2-4c31-95f7-11677f6f365f.gif)
+
 ## Dependencies
 * [druid](https://github.com/linebender/druid): 0.7.0
 * [winres](https://github.com/mxre/winres): 0.1
