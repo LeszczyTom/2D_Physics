@@ -126,26 +126,16 @@ impl Widget<AppData> for PhysicsSimulationWidget {
 
         // Paint the obstacles
         for obstacle in &data.obstacles {
-            let rect = Rect::from_origin_size((obstacle.x, obstacle.y), (obstacle.width, obstacle.height));
-            ctx.fill(rect, &obstacle.color);
+            obstacle.paint(ctx);
         }
        
         // Paint the balls
         for ball in &data.balls {
-            let circle = Circle::new((ball.x, ball.y), ball.radius);
-            ctx.fill(circle, &ball.color);
+            ball.paint(ctx);
         }
 
         // Paint the preview
-        if data.preview.mouse_down_pos.is_some() && data.preview.color.is_some() {
-            let cursor_pos = data.preview.mouse_down_pos.unwrap();
-            let circle = Circle::new((cursor_pos.x, cursor_pos.y), DEFAULT_BALL_SIZE);
-            ctx.fill(circle, data.preview.color.as_ref().unwrap());
-
-            if data.preview.arrow.is_some() {
-                ctx.stroke(data.preview.arrow.as_ref().unwrap(), &Color::WHITE, 2.);
-            }
-        }
+        data.preview.paint(ctx, DEFAULT_BALL_SIZE);
     }
 }
 

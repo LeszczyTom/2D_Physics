@@ -13,4 +13,9 @@ impl Obstacle {
     pub fn equals(&self, other: &Obstacle) -> bool {
         self.x == other.x && self.y == other.y && self.width == other.width && self.height == other.height && self.color == other.color
     }
+
+    pub fn paint(&self, ctx: &mut PaintCtx) {
+        let rect = Rect::from_origin_size((self.x, self.y), (self.width, self.height));
+        ctx.fill(rect, &self.color);
+    }
 }

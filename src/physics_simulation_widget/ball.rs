@@ -96,4 +96,9 @@ impl Ball {
         self.x += self.vx;
         self.y += self.vy;
     }
+
+    pub fn paint(&self, ctx: &mut PaintCtx) {
+        let circle = Circle::new((self.x, self.y), self.radius);
+        ctx.fill(circle, &self.color);
+    }
 }
