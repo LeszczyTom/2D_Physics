@@ -86,10 +86,10 @@ impl AppData {
 
     pub fn set_border_wall(&mut self) {
         let borders = [
-            Obstacle { x: 0., y: self.size.height - 1., width: self.size.width, height: 1., color: Color::RED },
-            Obstacle { x: self.size.width - 1., y: 0., width: 1., height: self.size.height, color: Color::RED },
-            Obstacle { x: 1., y: 0., width: 1., height: self.size.height, color: Color::RED },
-            Obstacle { x: 0., y: 1., width: self.size.width, height: 1., color: Color::RED },
+            Obstacle::new(Point::new(0., self.size.height), Point::new(self.size.width, self.size.height + 100.), Color::RED),
+            Obstacle::new(Point::new(self.size.width, 0.), Point::new(self.size.width + 100., self.size.height), Color::RED),
+            Obstacle::new(Point::new(-100., 0.), Point::new(0., self.size.height), Color::RED),
+            Obstacle::new(Point::new(0., -100.), Point::new(self.size.width, 0.), Color::RED), 
         ];
 
         if self.border_wall.is_some() {
@@ -115,9 +115,7 @@ impl AppData {
         for i in 0..balls.len() {
             balls[i].update(self);
             for obstacle in self.obstacles.iter() {
-                if are_ball_obstacle_overlapping(&balls[i], obstacle) {
-                    resolve_overlap(&mut balls, i, obstacle);
-                }
+                obstacle.collide(&mut balls, i);
             }
 
             for j in 0..balls.len() {

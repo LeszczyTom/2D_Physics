@@ -124,8 +124,14 @@ impl Widget<AppData> for PhysicsSimulationWidget {
         let rect = size.to_rect();
         ctx.fill(rect, &BACKGROUND_COLOR);
 
-        // Paint the obstacles
+        // Paint the obstacles but not the walls
         for obstacle in &data.obstacles {
+            if let Some(border_wall) = &data.border_wall {
+                if obstacle == &border_wall[0] || obstacle == &border_wall[1] || obstacle == &border_wall[2] || obstacle == &border_wall[3] {
+                    continue;
+                }
+            }
+                 
             obstacle.paint(ctx);
         }
        
@@ -215,56 +221,6 @@ fn are_balls_overlapping(b1: &Ball, b2: &Ball) -> bool {
     false
 }
 
-fn are_ball_obstacle_overlapping(ball: &Ball, obstacle: &Obstacle) -> bool{
-    let delta_x = ball.x - f64::max(obstacle.x, f64::min(ball.x, obstacle.x + obstacle.width));
-    let delta_y = ball.y - f64::max(obstacle.y, f64::min(ball.y, obstacle.y + obstacle.height));
-    if (delta_x * delta_x + delta_y * delta_y) > (ball.radius * ball.radius) {
-        return false;
-    }
-    true
-}
-
-fn resolve_overlap(balls: &mut Vec<Ball>, i: usize, obstacle: &Obstacle) {
-    let mut ball = balls[i].clone();
-    let delta_x = ball.x - f64::max(obstacle.x, f64::min(ball.x, obstacle.x + obstacle.width));
-    let delta_y = ball.y - f64::max(obstacle.y, f64::min(ball.y, obstacle.y + obstacle.height));
-    let distance = f64::sqrt(delta_x * delta_x + delta_y * delta_y);
-
-    let overlap = ball.radius - distance;
-    ball.x += delta_x * overlap / distance;
-    ball.y += delta_y * overlap / distance;
-
-    if distance == 0. {
-        return;
-    }
- 
-    if ball.vx.abs() < 0.1 {
-        ball.vx = 0.;
-    }
-    if ball.vy.abs() < 0.1 {
-        ball.vy = 0.;
-    }
-
-    let normal_x = delta_x / distance;
-    let normal_y = delta_y / distance;
-
-    let dot_product = ball.vx * normal_x + ball.vy * normal_y;
-    if dot_product > 0. {
-        return;
-    }
-
-    ball.vx -= 2. * dot_product * normal_x;
-    ball.vy -= 2. * dot_product * normal_y;
-
-    ball.vx *= 0.7;
-    ball.vy *= 0.7;
-
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-
-    balls[i] = ball;
-}
-
 pub fn get_new_appdata(size: Size) -> AppData {
     let mut data = AppData::new(size, DEFAULT_GRAVITY_TUPLE);
 
@@ -273,9 +229,10 @@ pub fn get_new_appdata(size: Size) -> AppData {
     data.add_ball(Ball::new(50.0, 50.0, 0.0, 15.0, DEFAULT_BALL_SIZE, Color::SILVER));
     data.add_ball(Ball::new(220.0, 110.0, 0.0, 5.0, DEFAULT_BALL_SIZE, Color::YELLOW));
     data.add_ball(Ball::new(400.0, 500.0, -10.0, 1.0, DEFAULT_BALL_SIZE, Color::OLIVE));
-    data.add_obstacle(Obstacle { x: 200., y: 200., width: 100., height: 100., color: Color::RED });
-    data.add_obstacle(Obstacle { x: 50., y: 600., width: 500., height: 10., color: Color::RED });
-
+    data.add_obstacle(Obstacle::new(Point::new(200., 200.), Point::new(300., 300.), Color::RED));
+    data.add_obstacle(Obstacle::new(Point::new(50., 600.), Point::new(550., 610.), Color::RED));
+    data.add_obstacle(Obstacle::new(Point::new(50., 50.), Point::new(59., 59.), Color::RED));
+    
     data
 }
 
